@@ -2,14 +2,14 @@ const asyncHandler = require("express-async-handler");
 const Contact = require("../models/contactModel");
 
 const {
-  constants: { OK, CREATED, BAD_REQUEST, NOT_FOUND },
+  constants: { OK, CREATED, BAD_REQUEST, FORBIDDEN, NOT_FOUND },
 } = require("../constants");
 
 //@desc Get all contacts
 //@route GET /api/contacts
 //@access private
 const getAllContacts = asyncHandler(async (req, res) => {
-  const contacts = await Contact.find();
+  const contacts = await Contact.find({ user_id: req.user.id });
   res.status(OK).json(contacts);
 });
 
@@ -23,6 +23,7 @@ const createContact = asyncHandler(async (req, res) => {
     throw new Error("All fields are mandatory");
   }
   const contact = await Contact.create({
+    user_id: req.user.id,
     name,
     email,
     phone,
@@ -55,6 +56,11 @@ const updateContact = asyncHandler(async (req, res) => {
     throw new Error(`Contact with id of ${req.params.id} not found`);
   }
 
+  if (contact.user_id.toString() !== req.user.id) {
+    res.status(FORBIDDEN);
+    throw new Error("User does not have permissions to perform this operation");
+  }
+
   const updatedContact = await Contact.findByIdAndUpdate(
     req.params.id,
     req.body,
@@ -76,7 +82,13 @@ const deleteContact = asyncHandler(async (req, res) => {
     res.status(NOT_FOUND);
     throw new Error(`Contact with id of ${req.params.id} not found`);
   }
-  await Contact.deleteOne({ _id: contact.id });
+
+  if (contact.user_id.toString() !== req.user.id) {
+    res.status(FORBIDDEN);
+    throw new Error("User does not have permissions to perform this operation");
+  }
+
+  await Contact.deleteOne({ _id: req.params.id });
   res.status(OK).json("Contact deleted");
 });
 
